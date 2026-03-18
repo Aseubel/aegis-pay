@@ -23,8 +23,16 @@ func (r *GORMOrderRepository) Save(ctx context.Context, order *transaction.Payme
 }
 
 func (r *GORMOrderRepository) Update(ctx context.Context, order *transaction.PaymentOrder) error {
-	po := toPaymentOrderPO(order)
-	return r.db.WithContext(ctx).Save(po).Error
+	return r.db.WithContext(ctx).Model(&PaymentOrderPO{}).
+		Where("trade_no = ?", order.TradeNo).
+		Updates(map[string]interface{}{
+			"status":           order.Status,
+			"channel_trade_no": order.ChannelTradeNo,
+			"pay_url":          order.PayURL,
+			"expired_at":       order.ExpiredAt,
+			"success_at":       order.SuccessAt,
+			"updated_at":       order.UpdatedAt,
+		}).Error
 }
 
 func (r *GORMOrderRepository) FindByTradeNo(ctx context.Context, tradeNo string) (*transaction.PaymentOrder, error) {
@@ -117,8 +125,14 @@ func (r *GORMRefundRepository) Save(ctx context.Context, refund *transaction.Ref
 }
 
 func (r *GORMRefundRepository) Update(ctx context.Context, refund *transaction.RefundOrder) error {
-	po := toRefundOrderPO(refund)
-	return r.db.WithContext(ctx).Save(po).Error
+	return r.db.WithContext(ctx).Model(&RefundOrderPO{}).
+		Where("refund_no = ?", refund.RefundNo).
+		Updates(map[string]interface{}{
+			"status":            refund.Status,
+			"channel_refund_no": refund.ChannelRefundNo,
+			"success_at":        refund.SuccessAt,
+			"updated_at":        refund.UpdatedAt,
+		}).Error
 }
 
 func (r *GORMRefundRepository) FindByRefundNo(ctx context.Context, refundNo string) (*transaction.RefundOrder, error) {
