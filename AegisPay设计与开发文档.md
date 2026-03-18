@@ -12,18 +12,18 @@
 
 本项目虽然是单体应用，但内部严格划分为四层架构（依赖方向严格由外向内）：
 
-1. **User Interface 层 (用户接口层 / `interfaces`)**
+1. **User Interface 层 (用户接口层 /** **`interfaces`)**
    - 负责接收外部请求和数据校验。
    - 包含：HTTP API 路由 (Gin/Echo)、支付渠道异步回调 (Webhook) 处理器。
-2. **Application 层 (应用服务层 / `application`)**
+2. **Application 层 (应用服务层 /** **`application`)**
    - 负责用例流转（Use Cases），是领域服务的编排者。
    - 负责事务控制、分布式锁的获取、发布领域事件。
    - **禁止**在此层编写核心业务规则（如计算手续费、校验支付状态）。
-3. **Domain 层 (领域层 / `domain`) - 核心！**
+3. **Domain 层 (领域层 /** **`domain`) - 核心！**
    - 包含业务实体 (Entity)、值对象 (Value Object)、领域服务 (Domain Service) 和防腐层接口 (Repository/Gateway Interface)。
    - 负责核心支付状态机流转、风控规则、金额计算。
    - **要求**：纯 Go 代码，没有任何外部框架（如 GORM, Redis）的 Import。
-4. **Infrastructure 层 (基础设施层 / `infrastructure`)**
+4. **Infrastructure 层 (基础设施层 /** **`infrastructure`)**
    - 负责实现 Domain 层定义的接口。
    - 包含：MySQL 持久化 (GORM)、Redis 缓存及 **Redis Streams 消息队列**、外部支付渠道（微信/支付宝/Stripe）的实际 API 调用。
 
@@ -118,54 +118,3 @@ aegis-pay/
 4. **Step 4 - 应用层编排 (Application)**
    - **任务要求**：编写 `internal/application/pay_app.go`。实现统一下单用例：1. 开启事务。2. 创建 PaymentOrder 实体并存入 Repo。3. 调用 Channel Gateway 发起支付。4. 提交事务并返回支付链接/Token给接口层。
 
-## 七、 最小化跑通指南 (MVP 启动流程)
-
-对于个人开发者，请按照以下步骤快速跑通 AegisPay 的核心主链路（下单 -> 模拟支付 -> Redis Streams 异步通知）。
-
-### 1. 启动基础设施
-
-如果你本地有 Docker，只需两行命令启动 MySQL 和 Redis：
-
-```
-docker run -d --name aegis-mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=aegis_pay mysql:8.0
-docker run -d --name aegis-redis -p 6379:6379 redis:7.0
-```
-
-### 2. 初始化 Go 项目并安装核心依赖
-
-```
-go mod init aegis-pay
-# 安装 Web 框架、ORM 和 Redis 客户端
-go get -u [github.com/gin-gonic/gin](https://github.com/gin-gonic/gin)
-go get -u gorm.io/gorm
-go get -u gorm.io/driver/mysql
-go get -u [github.com/redis/go-redis/v9](https://github.com/redis/go-redis/v9)
-# 安装 Google Wire 依赖注入工具
-go get -u [github.com/google/wire/cmd/wire](https://github.com/google/wire/cmd/wire)
-```
-
-### 3. 让 AI 编写 MVP 代码
-
-按照文档中的 **SOP（第六节）**，依次将 prompt 发送给 AI 助手。为了快速跑通，第一版你可以告诉 AI：
-
-- *"不需要对接真实的微信支付，在 `channel_adapter` 中写一个 `MockAdapter`，直接返回一个假的支付链接即可。"*
-- *"在应用层中写一个伪造的支付回调接口，收到请求后直接调用 Order 的 Success() 方法，并通过 redis 客户端向 `notify_stream` 投递一条成功消息。"*
-
-### 4. 依赖注入与运行
-
-当 AI 帮你把各层的代码写完后，在 `cmd/server/` 目录下创建一个 `wire.go`，让 AI 帮你写好 `wire.Build` 逻辑。
-
-然后在项目根目录执行：
-
-```
-wire ./cmd/server
-go run ./cmd/server/main.go
-```
-
-### 5. 联调测试
-
-启动成功后，打开终端或 Postman：
-
-1. **测试下单 API**：POST `http://localhost:8080/api/v1/orders`，观察控制台是否成功将订单以 `INIT` 状态存入 MySQL。
-2. **测试模拟回调 API**：POST `http://localhost:8080/webhooks/mock_pay_success`，传入刚生成的 TradeNo，观察订单状态是否变为 `SUCCESS`。
-3. **验证 Redis Streams**：打开 Redis 客户端，输入 `XRANGE notify_stream - +`，如果看到里面静静躺着一条通知商户的 Webhook 任务，**恭喜你，DDD 支付系统的主干已经彻底跑通了！**
