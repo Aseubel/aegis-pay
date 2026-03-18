@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"aegis-pay/internal/application"
+	"aegis-pay/internal/config"
 	"aegis-pay/internal/infrastructure/channel_adapter"
 
 	"github.com/gin-gonic/gin"
@@ -16,11 +17,11 @@ type WebhookHandler struct {
 	alipayCallbackHandler *channel_adapter.AlipayCallbackHandler
 }
 
-func NewWebhookHandler(payApp *application.PayApp) *WebhookHandler {
+func NewWebhookHandler(payApp *application.PayApp, cfg *config.Config) *WebhookHandler {
 	return &WebhookHandler{
 		payApp:                payApp,
-		wechatCallbackHandler: channel_adapter.NewWechatCallbackHandler(""),
-		alipayCallbackHandler: channel_adapter.NewAlipayCallbackHandler("", ""),
+		wechatCallbackHandler: channel_adapter.NewWechatCallbackHandler(cfg.Wechat.APIKey),
+		alipayCallbackHandler: channel_adapter.NewAlipayCallbackHandler(cfg.Alipay.AppID, cfg.Alipay.AlipayPublicKey),
 	}
 }
 

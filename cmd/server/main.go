@@ -77,10 +77,17 @@ func run() error {
 
 	// 初始化 HTTP 处理器
 	orderHandler := api.NewOrderHandler(payApp)
-	webhookHandler := webhooks.NewWebhookHandler(payApp)
+	webhookHandler := webhooks.NewWebhookHandler(payApp, cfg)
 
-	// 配置 Gin 路由
-	gin.SetMode(gin.DebugMode)
+	// 配置 Gin 路由模式
+	switch cfg.App.Mode {
+	case "release":
+		gin.SetMode(gin.ReleaseMode)
+	case "test":
+		gin.SetMode(gin.TestMode)
+	default:
+		gin.SetMode(gin.DebugMode)
+	}
 	router := gin.Default()
 
 	// 健康检查接口
@@ -144,9 +151,9 @@ func initDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	}
 
 	// 配置连接池
-	sqlDB.SetMaxIdleConns(10)           // 最大空闲连接数
-	sqlDB.SetMaxOpenConns(100)          // 最大打开连接数
-	sqlDB.SetConnMaxLifetime(time.Hour) // 连接最大生命周期
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
 
 	return db, nil
 }
@@ -157,6 +164,7 @@ func initRedis(cfg config.RedisConfig) *redis.Client {
 		Addr:     cfg.GetAddr(),
 		Password: cfg.Password,
 		DB:       cfg.DB,
+		PoolSize: cfg.PoolSize,
 	})
 }
 
