@@ -1,4 +1,4 @@
-.PHONY: all build run test clean docker-build docker-up docker-down docker-logs
+.PHONY: all build run test clean docker-build docker-up docker-down docker-logs wire wire-check
 
 # 默认目标
 all: build
@@ -19,6 +19,14 @@ test:
 clean:
 	rm -f aegis-pay.exe
 	go clean
+
+# 生成 Wire 依赖注入代码
+wire:
+	go run github.com/google/wire/cmd/wire@latest gen ./cmd/server
+
+# 检查 Wire 生成的代码是否是最新的
+wire-check:
+	go run github.com/google/wire/cmd/wire@latest check ./cmd/server
 
 # 构建 Docker 镜像
 docker-build:
