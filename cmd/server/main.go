@@ -12,6 +12,8 @@ import (
 
 	"aegis-pay/internal/application"
 	"aegis-pay/internal/config"
+	"aegis-pay/internal/domain/channel"
+	"aegis-pay/internal/domain/transaction"
 	"aegis-pay/internal/infrastructure/channel_adapter"
 	"aegis-pay/internal/infrastructure/mq"
 	"aegis-pay/internal/infrastructure/persistence"
@@ -42,42 +44,21 @@ func run() error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// 初始化 MySQL 数据库
-	db, err := initDB(cfg.Database)
+	// 使用 Wire 自动注入依赖
+	app, err := InitializeApp(cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize app: %w", err)
 	}
 
 	// 自动迁移数据库表结构
-	if err := persistence.AutoMigrate(db); err != nil {
+	if err := persistence.AutoMigrate(app.DBManager.GetDB()); err != nil {
 		return err
 	}
 
-	// 初始化 Redis 客户端
-	redisClient := initRedis(cfg.Redis)
-
-	// 初始化分布式锁管理器和消息队列
-	lockManager := mq.NewLockManager(redisClient)
-	redisMQ := mq.NewRedisStreamMQ(redisClient)
-	if err := redisMQ.InitStream(context.Background()); err != nil {
+	// 初始化 Redis Stream
+	if err := app.RedisMQ.InitStream(context.Background()); err != nil {
 		log.Printf("Warning: Failed to init redis stream: %v", err)
 	}
-
-	// 初始化仓储
-	orderRepo := persistence.NewGORMOrderRepository(db)
-	refundRepo := persistence.NewGORMRefundRepository(db)
-	dbManager := persistence.NewDBManager(db)
-
-	// 初始化支付渠道适配器（使用 Mock 适配器用于测试）
-	mockAdapter := channel_adapter.NewMockAdapter()
-
-	// 初始化应用服务
-	payApp := application.NewPayApp(dbManager, orderRepo, refundRepo, mockAdapter, redisMQ, lockManager)
-	notifyApp := application.NewNotifyApp(redisMQ)
-
-	// 初始化 HTTP 处理器
-	orderHandler := api.NewOrderHandler(payApp)
-	webhookHandler := webhooks.NewWebhookHandler(payApp, cfg)
 
 	// 配置 Gin 路由模式
 	switch cfg.App.Mode {
@@ -97,13 +78,13 @@ func run() error {
 
 	// 注册 API 路由
 	v1 := router.Group("/api/v1")
-	orderHandler.RegisterRoutes(v1)
+	app.OrderHandler.RegisterRoutes(v1)
 
 	// 注册 Webhook 路由
-	webhookHandler.RegisterRoutes(router)
+	app.WebhookHandler.RegisterRoutes(router)
 
 	// 启动商户通知消费者（后台运行）
-	go notifyApp.StartConsumer(context.Background())
+	go app.NotifyApp.StartConsumer(context.Background())
 
 	// 启动 HTTP 服务
 	addr := cfg.App.GetAddr()
@@ -168,8 +149,49 @@ func initRedis(cfg config.RedisConfig) *redis.Client {
 	})
 }
 
-// ProviderSet Google Wire 依赖注入集合（预留）
+// ProviderSet Google Wire 依赖注入集合
+// Wire 会根据这个集合自动生成依赖注入代码
 var ProviderSet = wire.NewSet(
+	// 基础设施初始化函数
 	initDB,
 	initRedis,
+
+	// 配置提取函数
+	ProvideDatabaseConfig,
+	ProvideRedisConfig,
+
+	// 持久化层
+	persistence.NewDBManager,
+	persistence.NewGORMOrderRepository,
+	persistence.NewGORMRefundRepository,
+
+	// 接口到实现的映射
+	wire.Bind(new(transaction.OrderRepository), new(*persistence.GORMOrderRepository)),
+	wire.Bind(new(transaction.RefundRepository), new(*persistence.GORMRefundRepository)),
+	wire.Bind(new(channel.PaymentGateway), new(*channel_adapter.MockAdapter)),
+
+	// 消息队列和分布式锁
+	mq.NewLockManager,
+	mq.NewRedisStreamMQ,
+
+	// 支付渠道适配器
+	channel_adapter.NewMockAdapter,
+
+	// 应用服务层
+	application.NewPayApp,
+	application.NewNotifyApp,
+
+	// 接口层
+	api.NewOrderHandler,
+	webhooks.NewWebhookHandler,
 )
+
+// ProvideDatabaseConfig 从 config.Config 中提取 DatabaseConfig
+func ProvideDatabaseConfig(cfg *config.Config) config.DatabaseConfig {
+	return cfg.Database
+}
+
+// ProvideRedisConfig 从 config.Config 中提取 RedisConfig
+func ProvideRedisConfig(cfg *config.Config) config.RedisConfig {
+	return cfg.Redis
+}
