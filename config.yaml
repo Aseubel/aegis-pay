@@ -7,6 +7,15 @@ database:
   max_idle_conns: 10
   max_open_conns: 100
   conn_max_lifetime: 3600
+  readonly:
+    host: localhost
+    port: 3306
+    username: root
+    password: root
+    name: aegis_pay
+    max_idle_conns: 1
+    max_open_conns: 5
+    conn_max_lifetime: 900
 
 redis:
   host: localhost
@@ -34,6 +43,13 @@ alipay:
   alipay_public_key: ""
   seller_id: ""
   callback_url: ""
+
+# AI LLM 配置
+ai:
+  openai:
+    api_key: ""
+    model: "gpt-4o-mini"
+    base_url: ""
 
 # Milvus 向量库配置
 milvus:

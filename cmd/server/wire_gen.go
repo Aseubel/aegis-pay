@@ -41,7 +41,8 @@ func InitializeApp(cfg *config.Config) (*App, error) {
 	payApp := application.NewPayApp(dbManager, gormOrderRepository, gormRefundRepository, mockAdapter, redisStreamMQ, lockManager)
 	notifyApp := application.NewNotifyApp(redisStreamMQ)
 	service := copilot.NewService()
-	langChainNL2SQLGateway, err := ai_adapter.NewLangChainNL2SQLGateway(databaseConfig)
+	aiConfig := ProvideAIConfig(cfg)
+	langChainNL2SQLGateway, err := ai_adapter.NewLangChainNL2SQLGateway(databaseConfig, aiConfig)
 	if err != nil {
 		return nil, err
 	}

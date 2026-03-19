@@ -16,11 +16,24 @@ type Config struct {
 	App      AppConfig      `yaml:"app"`
 	Wechat   WechatConfig   `yaml:"wechat"`
 	Alipay   AlipayConfig   `yaml:"alipay"`
+	AI       AIConfig       `yaml:"ai"`
 	Milvus   MilvusConfig   `yaml:"milvus"`
 	Log      LogConfig      `yaml:"log"`
 }
 
 type DatabaseConfig struct {
+	Host            string                 `yaml:"host"`
+	Port            int                    `yaml:"port"`
+	Username        string                 `yaml:"username"`
+	Password        string                 `yaml:"password"`
+	Name            string                 `yaml:"name"`
+	MaxIdleConns    int                    `yaml:"max_idle_conns"`
+	MaxOpenConns    int                    `yaml:"max_open_conns"`
+	ConnMaxLifetime int                    `yaml:"conn_max_lifetime"`
+	ReadOnly        ReadOnlyDatabaseConfig `yaml:"readonly"`
+}
+
+type ReadOnlyDatabaseConfig struct {
 	Host            string `yaml:"host"`
 	Port            int    `yaml:"port"`
 	Username        string `yaml:"username"`
@@ -58,6 +71,16 @@ type AlipayConfig struct {
 	AlipayPublicKey string `yaml:"alipay_public_key"`
 	SellerID        string `yaml:"seller_id"`
 	CallbackURL     string `yaml:"callback_url"`
+}
+
+type AIConfig struct {
+	OpenAI OpenAIConfig `yaml:"openai"`
+}
+
+type OpenAIConfig struct {
+	APIKey  string `yaml:"api_key"`
+	Model   string `yaml:"model"`
+	BaseURL string `yaml:"base_url"`
 }
 
 type MilvusConfig struct {
@@ -108,6 +131,16 @@ func defaultConfig() *Config {
 			MaxIdleConns:    10,
 			MaxOpenConns:    100,
 			ConnMaxLifetime: 3600,
+			ReadOnly: ReadOnlyDatabaseConfig{
+				Host:            "localhost",
+				Port:            3306,
+				Username:        "root",
+				Password:        "root",
+				Name:            "aegis_pay",
+				MaxIdleConns:    1,
+				MaxOpenConns:    5,
+				ConnMaxLifetime: 900,
+			},
 		},
 		Redis: RedisConfig{
 			Host:     "localhost",
@@ -117,7 +150,7 @@ func defaultConfig() *Config {
 			PoolSize: 100,
 		},
 		App: AppConfig{
-			Host: "0.0.0.0",
+			Host: "127.0.0.1",
 			Port: 8080,
 			Mode: "debug",
 		},
@@ -133,6 +166,13 @@ func defaultConfig() *Config {
 			AlipayPublicKey: "",
 			SellerID:        "",
 			CallbackURL:     "",
+		},
+		AI: AIConfig{
+			OpenAI: OpenAIConfig{
+				APIKey:  "",
+				Model:   "gpt-4o-mini",
+				BaseURL: "",
+			},
 		},
 		Milvus: MilvusConfig{
 			Enabled:        false,
@@ -213,6 +253,38 @@ func loadEnv(cfg *Config) {
 			cfg.Database.ConnMaxLifetime = n
 		}
 	}
+	if v := os.Getenv("MYSQL_READONLY_HOST"); v != "" {
+		cfg.Database.ReadOnly.Host = v
+	}
+	if v := os.Getenv("MYSQL_READONLY_PORT"); v != "" {
+		if port, err := strconv.Atoi(v); err == nil {
+			cfg.Database.ReadOnly.Port = port
+		}
+	}
+	if v := os.Getenv("MYSQL_READONLY_USER"); v != "" {
+		cfg.Database.ReadOnly.Username = v
+	}
+	if v := os.Getenv("MYSQL_READONLY_PASSWORD"); v != "" {
+		cfg.Database.ReadOnly.Password = v
+	}
+	if v := os.Getenv("MYSQL_READONLY_DATABASE"); v != "" {
+		cfg.Database.ReadOnly.Name = v
+	}
+	if v := os.Getenv("MYSQL_READONLY_MAX_IDLE_CONNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Database.ReadOnly.MaxIdleConns = n
+		}
+	}
+	if v := os.Getenv("MYSQL_READONLY_MAX_OPEN_CONNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Database.ReadOnly.MaxOpenConns = n
+		}
+	}
+	if v := os.Getenv("MYSQL_READONLY_CONN_MAX_LIFETIME"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Database.ReadOnly.ConnMaxLifetime = n
+		}
+	}
 
 	// Redis
 	if v := os.Getenv("REDIS_HOST"); v != "" {
@@ -279,6 +351,16 @@ func loadEnv(cfg *Config) {
 	}
 	if v := os.Getenv("ALIPAY_CALLBACK_URL"); v != "" {
 		cfg.Alipay.CallbackURL = v
+	}
+
+	if v := os.Getenv("OPENAI_API_KEY"); v != "" {
+		cfg.AI.OpenAI.APIKey = v
+	}
+	if v := os.Getenv("OPENAI_MODEL"); v != "" {
+		cfg.AI.OpenAI.Model = v
+	}
+	if v := os.Getenv("OPENAI_BASE_URL"); v != "" {
+		cfg.AI.OpenAI.BaseURL = v
 	}
 
 	if v := os.Getenv("MILVUS_ENABLED"); v != "" {

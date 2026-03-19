@@ -166,6 +166,7 @@ var ProviderSet = wire.NewSet(
 	// 配置提取函数
 	ProvideDatabaseConfig,
 	ProvideRedisConfig,
+	ProvideAIConfig,
 	ProvideMilvusConfig,
 
 	// 持久化层
@@ -212,6 +213,10 @@ func ProvideDatabaseConfig(cfg *config.Config) config.DatabaseConfig {
 // ProvideRedisConfig 从 config.Config 中提取 RedisConfig
 func ProvideRedisConfig(cfg *config.Config) config.RedisConfig {
 	return cfg.Redis
+}
+
+func ProvideAIConfig(cfg *config.Config) config.AIConfig {
+	return cfg.AI
 }
 
 func ProvideMilvusConfig(cfg *config.Config) config.MilvusConfig {

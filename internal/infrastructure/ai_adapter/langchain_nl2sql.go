@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -22,12 +21,12 @@ type LangChainNL2SQLGateway struct {
 	schema      string
 }
 
-func NewLangChainNL2SQLGateway(cfg config.DatabaseConfig) (*LangChainNL2SQLGateway, error) {
-	readReplica, err := newReadReplicaDB(cfg)
+func NewLangChainNL2SQLGateway(dbCfg config.DatabaseConfig, aiCfg config.AIConfig) (*LangChainNL2SQLGateway, error) {
+	readReplica, err := newReadReplicaDB(dbCfg)
 	if err != nil {
 		return nil, err
 	}
-	model, err := newLLMModel()
+	model, err := newLLMModel(aiCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -103,11 +102,12 @@ func (g *LangChainNL2SQLGateway) executeReadOnlyQuery(ctx context.Context, sqlTe
 }
 
 func newReadReplicaDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
-	host := getenvOrDefault("MYSQL_READONLY_HOST", cfg.Host)
-	port := getenvIntOrDefault("MYSQL_READONLY_PORT", cfg.Port)
-	user := getenvOrDefault("MYSQL_READONLY_USER", cfg.Username)
-	password := getenvOrDefault("MYSQL_READONLY_PASSWORD", cfg.Password)
-	name := getenvOrDefault("MYSQL_READONLY_DATABASE", cfg.Name)
+	ro := cfg.ReadOnly
+	host := fallbackString(ro.Host, cfg.Host)
+	port := fallbackInt(ro.Port, cfg.Port)
+	user := fallbackString(ro.Username, cfg.Username)
+	password := fallbackString(ro.Password, cfg.Password)
+	name := fallbackString(ro.Name, cfg.Name)
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port, name)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -117,25 +117,33 @@ func newReadReplicaDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqlDB.SetMaxIdleConns(1)
-	sqlDB.SetMaxOpenConns(5)
-	sqlDB.SetConnMaxLifetime(15 * time.Minute)
+	maxIdleConns := fallbackInt(ro.MaxIdleConns, 1)
+	maxOpenConns := fallbackInt(ro.MaxOpenConns, 5)
+	connMaxLifetimeSeconds := fallbackInt(ro.ConnMaxLifetime, 900)
+	sqlDB.SetMaxIdleConns(maxIdleConns)
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(connMaxLifetimeSeconds) * time.Second)
 	return db, nil
 }
 
-func newLLMModel() (llms.Model, error) {
-	token := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+func newLLMModel(cfg config.AIConfig) (llms.Model, error) {
+	token := strings.TrimSpace(cfg.OpenAI.APIKey)
 	if token == "" {
 		return nil, nil
 	}
-	model := strings.TrimSpace(os.Getenv("OPENAI_MODEL"))
+	model := strings.TrimSpace(cfg.OpenAI.Model)
 	if model == "" {
 		model = "gpt-4o-mini"
 	}
-	return openai.New(
+	options := []openai.Option{
 		openai.WithToken(token),
 		openai.WithModel(model),
-	)
+	}
+	baseURL := strings.TrimSpace(cfg.OpenAI.BaseURL)
+	if baseURL != "" {
+		options = append(options, openai.WithBaseURL(baseURL))
+	}
+	return openai.New(options...)
 }
 
 func enforceReadOnly(sqlText string) string {
@@ -171,23 +179,17 @@ func defaultReadOnlySchema() string {
 	return "payment_orders(trade_no, out_trade_no, merchant_id, app_id, amount, status, channel_code, created_at, success_at); refund_orders(refund_no, trade_no, merchant_id, refund_amount, status, created_at)"
 }
 
-func getenvOrDefault(key, fallback string) string {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
+func fallbackString(value, fallback string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fallback
+	}
+	return trimmed
+}
+
+func fallbackInt(value, fallback int) int {
+	if value <= 0 {
 		return fallback
 	}
 	return value
-}
-
-func getenvIntOrDefault(key string, fallback int) int {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return fallback
-	}
-	var parsed int
-	_, err := fmt.Sscanf(value, "%d", &parsed)
-	if err != nil || parsed <= 0 {
-		return fallback
-	}
-	return parsed
 }
