@@ -9,6 +9,8 @@ package main
 import (
 	"aegis-pay/internal/application"
 	"aegis-pay/internal/config"
+	"aegis-pay/internal/domain/copilot"
+	"aegis-pay/internal/infrastructure/ai_adapter"
 	"aegis-pay/internal/infrastructure/channel_adapter"
 	"aegis-pay/internal/infrastructure/mq"
 	"aegis-pay/internal/infrastructure/persistence"
@@ -30,6 +32,7 @@ func InitializeApp(cfg *config.Config) (*App, error) {
 	dbManager := persistence.NewDBManager(db)
 	gormOrderRepository := persistence.NewGORMOrderRepository(db)
 	gormRefundRepository := persistence.NewGORMRefundRepository(db)
+	gormRiskReportRepository := persistence.NewGORMRiskReportRepository(db)
 	redisConfig := ProvideRedisConfig(cfg)
 	client := initRedis(redisConfig)
 	lockManager := mq.NewLockManager(client)
@@ -37,9 +40,22 @@ func InitializeApp(cfg *config.Config) (*App, error) {
 	mockAdapter := channel_adapter.NewMockAdapter()
 	payApp := application.NewPayApp(dbManager, gormOrderRepository, gormRefundRepository, mockAdapter, redisStreamMQ, lockManager)
 	notifyApp := application.NewNotifyApp(redisStreamMQ)
+	service := copilot.NewService()
+	langChainNL2SQLGateway, err := ai_adapter.NewLangChainNL2SQLGateway(databaseConfig)
+	if err != nil {
+		return nil, err
+	}
+	milvusConfig := ProvideMilvusConfig(cfg)
+	vectorStore, err := ai_adapter.NewVectorStore(milvusConfig)
+	if err != nil {
+		return nil, err
+	}
+	langChainRAGGateway := ai_adapter.NewLangChainRAGGateway(langChainNL2SQLGateway, vectorStore)
+	copilotApp := application.NewCopilotApp(service, langChainNL2SQLGateway, langChainRAGGateway, gormRiskReportRepository, redisStreamMQ)
 	orderHandler := api.NewOrderHandler(payApp)
+	copilotHandler := api.NewCopilotHandler(copilotApp)
 	webhookHandler := webhooks.NewWebhookHandler(payApp, cfg)
-	app := NewApp(cfg, dbManager, gormOrderRepository, gormRefundRepository, lockManager, redisStreamMQ, mockAdapter, payApp, notifyApp, orderHandler, webhookHandler)
+	app := NewApp(cfg, dbManager, gormOrderRepository, gormRefundRepository, gormRiskReportRepository, lockManager, redisStreamMQ, mockAdapter, payApp, notifyApp, copilotApp, orderHandler, copilotHandler, webhookHandler)
 	return app, nil
 }
 
@@ -51,12 +67,15 @@ type App struct {
 	DBManager      *persistence.DBManager
 	OrderRepo      *persistence.GORMOrderRepository
 	RefundRepo     *persistence.GORMRefundRepository
+	RiskReportRepo *persistence.GORMRiskReportRepository
 	LockManager    *mq.LockManager
 	RedisMQ        *mq.RedisStreamMQ
 	MockAdapter    *channel_adapter.MockAdapter
 	PayApp         *application.PayApp
 	NotifyApp      *application.NotifyApp
+	CopilotApp     *application.CopilotApp
 	OrderHandler   *api.OrderHandler
+	CopilotHandler *api.CopilotHandler
 	WebhookHandler *webhooks.WebhookHandler
 }
 
@@ -66,12 +85,15 @@ func NewApp(
 	dbManager *persistence.DBManager,
 	orderRepo *persistence.GORMOrderRepository,
 	refundRepo *persistence.GORMRefundRepository,
+	riskReportRepo *persistence.GORMRiskReportRepository,
 	lockManager *mq.LockManager,
 	redisMQ *mq.RedisStreamMQ,
 	mockAdapter *channel_adapter.MockAdapter,
 	payApp *application.PayApp,
 	notifyApp *application.NotifyApp,
+	copilotApp *application.CopilotApp,
 	orderHandler *api.OrderHandler,
+	copilotHandler *api.CopilotHandler,
 	webhookHandler *webhooks.WebhookHandler,
 ) *App {
 	return &App{
@@ -79,12 +101,15 @@ func NewApp(
 		DBManager:      dbManager,
 		OrderRepo:      orderRepo,
 		RefundRepo:     refundRepo,
+		RiskReportRepo: riskReportRepo,
 		LockManager:    lockManager,
 		RedisMQ:        redisMQ,
 		MockAdapter:    mockAdapter,
 		PayApp:         payApp,
 		NotifyApp:      notifyApp,
+		CopilotApp:     copilotApp,
 		OrderHandler:   orderHandler,
+		CopilotHandler: copilotHandler,
 		WebhookHandler: webhookHandler,
 	}
 }

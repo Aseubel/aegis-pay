@@ -20,12 +20,15 @@ type App struct {
 	DBManager      *persistence.DBManager
 	OrderRepo      *persistence.GORMOrderRepository
 	RefundRepo     *persistence.GORMRefundRepository
+	RiskReportRepo *persistence.GORMRiskReportRepository
 	LockManager    *mq.LockManager
 	RedisMQ        *mq.RedisStreamMQ
 	MockAdapter    *channel_adapter.MockAdapter
 	PayApp         *application.PayApp
 	NotifyApp      *application.NotifyApp
+	CopilotApp     *application.CopilotApp
 	OrderHandler   *api.OrderHandler
+	CopilotHandler *api.CopilotHandler
 	WebhookHandler *webhooks.WebhookHandler
 }
 
@@ -46,12 +49,15 @@ func NewApp(
 	dbManager *persistence.DBManager,
 	orderRepo *persistence.GORMOrderRepository,
 	refundRepo *persistence.GORMRefundRepository,
+	riskReportRepo *persistence.GORMRiskReportRepository,
 	lockManager *mq.LockManager,
 	redisMQ *mq.RedisStreamMQ,
 	mockAdapter *channel_adapter.MockAdapter,
 	payApp *application.PayApp,
 	notifyApp *application.NotifyApp,
+	copilotApp *application.CopilotApp,
 	orderHandler *api.OrderHandler,
+	copilotHandler *api.CopilotHandler,
 	webhookHandler *webhooks.WebhookHandler,
 ) *App {
 	return &App{
@@ -59,12 +65,15 @@ func NewApp(
 		DBManager:      dbManager,
 		OrderRepo:      orderRepo,
 		RefundRepo:     refundRepo,
+		RiskReportRepo: riskReportRepo,
 		LockManager:    lockManager,
 		RedisMQ:        redisMQ,
 		MockAdapter:    mockAdapter,
 		PayApp:         payApp,
 		NotifyApp:      notifyApp,
+		CopilotApp:     copilotApp,
 		OrderHandler:   orderHandler,
+		CopilotHandler: copilotHandler,
 		WebhookHandler: webhookHandler,
 	}
 }

@@ -15,24 +15,24 @@ type WechatCallbackHandler struct {
 }
 
 type WechatPayNotifyRequest struct {
-	ReturnCode string `xml:"return_code"`
-	ReturnMsg  string `xml:"return_msg"`
-	AppID      string `xml:"appid"`
-	MchID      string `xml:"mch_id"`
-	DeviceInfo string `xml:"device_info"`
-	NonceStr   string `xml:"nonce_str"`
-	Sign       string `xml:"sign"`
-	ResultCode string `xml:"result_code"`
-	ErrCode    string `xml:"err_code"`
-	ErrCodeDes string `xml:"err_code_des"`
-	TradeType  string `xml:"trade_type"`
-	BankType   string `xml:"bank_type"`
-	TotalFee   int64  `xml:"total_fee"`
-	CashFee    int64  `xml:"cash_fee"`
+	ReturnCode    string `xml:"return_code"`
+	ReturnMsg     string `xml:"return_msg"`
+	AppID         string `xml:"appid"`
+	MchID         string `xml:"mch_id"`
+	DeviceInfo    string `xml:"device_info"`
+	NonceStr      string `xml:"nonce_str"`
+	Sign          string `xml:"sign"`
+	ResultCode    string `xml:"result_code"`
+	ErrCode       string `xml:"err_code"`
+	ErrCodeDes    string `xml:"err_code_des"`
+	TradeType     string `xml:"trade_type"`
+	BankType      string `xml:"bank_type"`
+	TotalFee      int64  `xml:"total_fee"`
+	CashFee       int64  `xml:"cash_fee"`
 	TransactionID string `xml:"transaction_id"`
-	OutTradeNo string `xml:"out_trade_no"`
-	Attach     string `xml:"attach"`
-	TimeEnd    string `xml:"time_end"`
+	OutTradeNo    string `xml:"out_trade_no"`
+	Attach        string `xml:"attach"`
+	TimeEnd       string `xml:"time_end"`
 }
 
 type WechatPayNotifyResponse struct {
@@ -68,14 +68,14 @@ func (h *WechatCallbackHandler) ParseAndValidate(r *http.Request) (*WechatPayNot
 
 func (h *WechatCallbackHandler) validateSign(req WechatPayNotifyRequest) error {
 	params := map[string]string{
-		"return_code":  req.ReturnCode,
-		"appid":        req.AppID,
-		"mch_id":       req.MchID,
-		"nonce_str":    req.NonceStr,
-		"result_code":  req.ResultCode,
+		"return_code":    req.ReturnCode,
+		"appid":          req.AppID,
+		"mch_id":         req.MchID,
+		"nonce_str":      req.NonceStr,
+		"result_code":    req.ResultCode,
 		"transaction_id": req.TransactionID,
-		"out_trade_no": req.OutTradeNo,
-		"total_fee":    fmt.Sprintf("%d", req.TotalFee),
+		"out_trade_no":   req.OutTradeNo,
+		"total_fee":      fmt.Sprintf("%d", req.TotalFee),
 	}
 
 	var keys []string

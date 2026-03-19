@@ -51,3 +51,19 @@ type RefundOrderPO struct {
 func (RefundOrderPO) TableName() string {
 	return "refund_orders"
 }
+
+type RiskReportPO struct {
+	ID               uint   `gorm:"primaryKey"`
+	ReportID         string `gorm:"uniqueIndex;size:64;not null"`
+	TradeNo          string `gorm:"index;size:64;not null"`
+	RiskScore        int    `gorm:"not null"`
+	RiskTags         string `gorm:"type:text"`
+	DiagnosisSummary string `gorm:"type:text"`
+	SuggestedAction  string `gorm:"size:255"`
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+func (RiskReportPO) TableName() string {
+	return "risk_reports"
+}

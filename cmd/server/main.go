@@ -13,7 +13,9 @@ import (
 	"aegis-pay/internal/application"
 	"aegis-pay/internal/config"
 	"aegis-pay/internal/domain/channel"
+	"aegis-pay/internal/domain/copilot"
 	"aegis-pay/internal/domain/transaction"
+	"aegis-pay/internal/infrastructure/ai_adapter"
 	"aegis-pay/internal/infrastructure/channel_adapter"
 	"aegis-pay/internal/infrastructure/mq"
 	"aegis-pay/internal/infrastructure/persistence"
@@ -59,6 +61,9 @@ func run() error {
 	if err := app.RedisMQ.InitStream(context.Background()); err != nil {
 		log.Printf("Warning: Failed to init redis stream: %v", err)
 	}
+	if err := app.RedisMQ.InitRiskStream(context.Background()); err != nil {
+		log.Printf("Warning: Failed to init risk stream: %v", err)
+	}
 
 	// 配置 Gin 路由模式
 	switch cfg.App.Mode {
@@ -79,12 +84,14 @@ func run() error {
 	// 注册 API 路由
 	v1 := router.Group("/api/v1")
 	app.OrderHandler.RegisterRoutes(v1)
+	app.CopilotHandler.RegisterRoutes(v1)
 
 	// 注册 Webhook 路由
 	app.WebhookHandler.RegisterRoutes(router)
 
 	// 启动商户通知消费者（后台运行）
 	go app.NotifyApp.StartConsumer(context.Background())
+	go app.CopilotApp.StartRiskConsumer(context.Background())
 
 	// 启动 HTTP 服务
 	addr := cfg.App.GetAddr()
@@ -159,16 +166,21 @@ var ProviderSet = wire.NewSet(
 	// 配置提取函数
 	ProvideDatabaseConfig,
 	ProvideRedisConfig,
+	ProvideMilvusConfig,
 
 	// 持久化层
 	persistence.NewDBManager,
 	persistence.NewGORMOrderRepository,
 	persistence.NewGORMRefundRepository,
+	persistence.NewGORMRiskReportRepository,
 
 	// 接口到实现的映射
 	wire.Bind(new(transaction.OrderRepository), new(*persistence.GORMOrderRepository)),
 	wire.Bind(new(transaction.RefundRepository), new(*persistence.GORMRefundRepository)),
 	wire.Bind(new(channel.PaymentGateway), new(*channel_adapter.MockAdapter)),
+	wire.Bind(new(copilot.DataAssistantGateway), new(*ai_adapter.LangChainNL2SQLGateway)),
+	wire.Bind(new(copilot.RiskAnalyzerGateway), new(*ai_adapter.LangChainRAGGateway)),
+	wire.Bind(new(copilot.RiskReportRepository), new(*persistence.GORMRiskReportRepository)),
 
 	// 消息队列和分布式锁
 	mq.NewLockManager,
@@ -176,13 +188,19 @@ var ProviderSet = wire.NewSet(
 
 	// 支付渠道适配器
 	channel_adapter.NewMockAdapter,
+	ai_adapter.NewVectorStore,
+	ai_adapter.NewLangChainNL2SQLGateway,
+	ai_adapter.NewLangChainRAGGateway,
+	copilot.NewService,
 
 	// 应用服务层
 	application.NewPayApp,
 	application.NewNotifyApp,
+	application.NewCopilotApp,
 
 	// 接口层
 	api.NewOrderHandler,
+	api.NewCopilotHandler,
 	webhooks.NewWebhookHandler,
 )
 
@@ -194,4 +212,8 @@ func ProvideDatabaseConfig(cfg *config.Config) config.DatabaseConfig {
 // ProvideRedisConfig 从 config.Config 中提取 RedisConfig
 func ProvideRedisConfig(cfg *config.Config) config.RedisConfig {
 	return cfg.Redis
+}
+
+func ProvideMilvusConfig(cfg *config.Config) config.MilvusConfig {
+	return cfg.Milvus
 }

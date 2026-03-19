@@ -195,7 +195,7 @@ func toRefundOrderEntity(po *RefundOrderPO) *transaction.RefundOrder {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&PaymentOrderPO{}, &RefundOrderPO{})
+	return db.AutoMigrate(&PaymentOrderPO{}, &RefundOrderPO{}, &RiskReportPO{})
 }
 
 type DBManager struct {

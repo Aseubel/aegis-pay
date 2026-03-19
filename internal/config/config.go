@@ -12,22 +12,23 @@ import (
 
 type Config struct {
 	Database DatabaseConfig `yaml:"database"`
-	Redis   RedisConfig   `yaml:"redis"`
-	App     AppConfig     `yaml:"app"`
-	Wechat  WechatConfig  `yaml:"wechat"`
-	Alipay  AlipayConfig  `yaml:"alipay"`
-	Log     LogConfig     `yaml:"log"`
+	Redis    RedisConfig    `yaml:"redis"`
+	App      AppConfig      `yaml:"app"`
+	Wechat   WechatConfig   `yaml:"wechat"`
+	Alipay   AlipayConfig   `yaml:"alipay"`
+	Milvus   MilvusConfig   `yaml:"milvus"`
+	Log      LogConfig      `yaml:"log"`
 }
 
 type DatabaseConfig struct {
 	Host            string `yaml:"host"`
-	Port           int    `yaml:"port"`
-	Username       string `yaml:"username"`
-	Password       string `yaml:"password"`
-	Name           string `yaml:"name"`
-	MaxIdleConns   int    `yaml:"max_idle_conns"`
-	MaxOpenConns   int    `yaml:"max_open_conns"`
-	ConnMaxLifetime int   `yaml:"conn_max_lifetime"`
+	Port            int    `yaml:"port"`
+	Username        string `yaml:"username"`
+	Password        string `yaml:"password"`
+	Name            string `yaml:"name"`
+	MaxIdleConns    int    `yaml:"max_idle_conns"`
+	MaxOpenConns    int    `yaml:"max_open_conns"`
+	ConnMaxLifetime int    `yaml:"conn_max_lifetime"`
 }
 
 type RedisConfig struct {
@@ -45,10 +46,10 @@ type AppConfig struct {
 }
 
 type WechatConfig struct {
-	AppID      string `yaml:"app_id"`
-	MchID      string `yaml:"mch_id"`
-	APIKey     string `yaml:"api_key"`
-	CertPath   string `yaml:"cert_path"`
+	AppID       string `yaml:"app_id"`
+	MchID       string `yaml:"mch_id"`
+	APIKey      string `yaml:"api_key"`
+	CertPath    string `yaml:"cert_path"`
 	CallbackURL string `yaml:"callback_url"`
 }
 
@@ -57,6 +58,25 @@ type AlipayConfig struct {
 	AlipayPublicKey string `yaml:"alipay_public_key"`
 	SellerID        string `yaml:"seller_id"`
 	CallbackURL     string `yaml:"callback_url"`
+}
+
+type MilvusConfig struct {
+	Enabled        bool   `yaml:"enabled"`
+	WriteEnabled   bool   `yaml:"write_enabled"`
+	Address        string `yaml:"address"`
+	Username       string `yaml:"username"`
+	Password       string `yaml:"password"`
+	Token          string `yaml:"token"`
+	Database       string `yaml:"database"`
+	Collection     string `yaml:"collection"`
+	Partition      string `yaml:"partition"`
+	VectorField    string `yaml:"vector_field"`
+	OutputField    string `yaml:"output_field"`
+	MetricType     string `yaml:"metric_type"`
+	FilterExpr     string `yaml:"filter_expr"`
+	Dimension      int    `yaml:"dimension"`
+	TopK           int    `yaml:"top_k"`
+	TimeoutSeconds int    `yaml:"timeout_seconds"`
 }
 
 type LogConfig struct {
@@ -81,12 +101,12 @@ func defaultConfig() *Config {
 	return &Config{
 		Database: DatabaseConfig{
 			Host:            "localhost",
-			Port:           3306,
-			Username:       "root",
-			Password:       "root",
-			Name:           "aegis_pay",
-			MaxIdleConns:   10,
-			MaxOpenConns:   100,
+			Port:            3306,
+			Username:        "root",
+			Password:        "root",
+			Name:            "aegis_pay",
+			MaxIdleConns:    10,
+			MaxOpenConns:    100,
 			ConnMaxLifetime: 3600,
 		},
 		Redis: RedisConfig{
@@ -102,10 +122,10 @@ func defaultConfig() *Config {
 			Mode: "debug",
 		},
 		Wechat: WechatConfig{
-			AppID:      "",
-			MchID:      "",
-			APIKey:     "",
-			CertPath:   "",
+			AppID:       "",
+			MchID:       "",
+			APIKey:      "",
+			CertPath:    "",
 			CallbackURL: "",
 		},
 		Alipay: AlipayConfig{
@@ -113,6 +133,24 @@ func defaultConfig() *Config {
 			AlipayPublicKey: "",
 			SellerID:        "",
 			CallbackURL:     "",
+		},
+		Milvus: MilvusConfig{
+			Enabled:        false,
+			WriteEnabled:   false,
+			Address:        "localhost:19530",
+			Username:       "",
+			Password:       "",
+			Token:          "",
+			Database:       "",
+			Collection:     "risk_knowledge",
+			Partition:      "",
+			VectorField:    "embedding",
+			OutputField:    "case_text",
+			MetricType:     "COSINE",
+			FilterExpr:     "",
+			Dimension:      64,
+			TopK:           3,
+			TimeoutSeconds: 3,
 		},
 		Log: LogConfig{
 			Level: "info",
@@ -241,6 +279,65 @@ func loadEnv(cfg *Config) {
 	}
 	if v := os.Getenv("ALIPAY_CALLBACK_URL"); v != "" {
 		cfg.Alipay.CallbackURL = v
+	}
+
+	if v := os.Getenv("MILVUS_ENABLED"); v != "" {
+		if enabled, err := strconv.ParseBool(v); err == nil {
+			cfg.Milvus.Enabled = enabled
+		}
+	}
+	if v := os.Getenv("MILVUS_WRITE_ENABLED"); v != "" {
+		if enabled, err := strconv.ParseBool(v); err == nil {
+			cfg.Milvus.WriteEnabled = enabled
+		}
+	}
+	if v := os.Getenv("MILVUS_ADDRESS"); v != "" {
+		cfg.Milvus.Address = v
+	}
+	if v := os.Getenv("MILVUS_USERNAME"); v != "" {
+		cfg.Milvus.Username = v
+	}
+	if v := os.Getenv("MILVUS_PASSWORD"); v != "" {
+		cfg.Milvus.Password = v
+	}
+	if v := os.Getenv("MILVUS_TOKEN"); v != "" {
+		cfg.Milvus.Token = v
+	}
+	if v := os.Getenv("MILVUS_DATABASE"); v != "" {
+		cfg.Milvus.Database = v
+	}
+	if v := os.Getenv("MILVUS_COLLECTION"); v != "" {
+		cfg.Milvus.Collection = v
+	}
+	if v := os.Getenv("MILVUS_PARTITION"); v != "" {
+		cfg.Milvus.Partition = v
+	}
+	if v := os.Getenv("MILVUS_VECTOR_FIELD"); v != "" {
+		cfg.Milvus.VectorField = v
+	}
+	if v := os.Getenv("MILVUS_OUTPUT_FIELD"); v != "" {
+		cfg.Milvus.OutputField = v
+	}
+	if v := os.Getenv("MILVUS_METRIC_TYPE"); v != "" {
+		cfg.Milvus.MetricType = v
+	}
+	if v := os.Getenv("MILVUS_FILTER_EXPR"); v != "" {
+		cfg.Milvus.FilterExpr = v
+	}
+	if v := os.Getenv("MILVUS_DIMENSION"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Milvus.Dimension = n
+		}
+	}
+	if v := os.Getenv("MILVUS_TOP_K"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Milvus.TopK = n
+		}
+	}
+	if v := os.Getenv("MILVUS_TIMEOUT_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Milvus.TimeoutSeconds = n
+		}
 	}
 
 	// Log

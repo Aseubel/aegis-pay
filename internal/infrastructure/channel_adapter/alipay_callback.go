@@ -12,48 +12,48 @@ import (
 )
 
 type AlipayCallbackHandler struct {
-	appID       string
+	appID        string
 	alipayPubKey string
 }
 
 type AlipayTradeNotification struct {
-	NotifyTime    string `json:"notify_time"`
-	NotifyType    string `json:"notify_type"`
-	NotifyID      string `json:"notify_id"`
-	AppID        string `json:"app_id"`
-	Charset      string `json:"charset"`
-	Version      string `json:"version"`
-	SignType     string `json:"sign_type"`
-	Sign         string `json:"sign"`
-	TradeNo      string `json:"trade_no"`
-	OutTradeNo   string `json:"out_trade_no"`
-	OutBizNo     string `json:"out_biz_no"`
-	BizType      string `json:"biz_type"`
-	TradeStatus  string `json:"trade_status"`
-	TotalAmount  string `json:"total_amount"`
-	ReceiptAmount string `json:"receipt_amount"`
+	NotifyTime     string `json:"notify_time"`
+	NotifyType     string `json:"notify_type"`
+	NotifyID       string `json:"notify_id"`
+	AppID          string `json:"app_id"`
+	Charset        string `json:"charset"`
+	Version        string `json:"version"`
+	SignType       string `json:"sign_type"`
+	Sign           string `json:"sign"`
+	TradeNo        string `json:"trade_no"`
+	OutTradeNo     string `json:"out_trade_no"`
+	OutBizNo       string `json:"out_biz_no"`
+	BizType        string `json:"biz_type"`
+	TradeStatus    string `json:"trade_status"`
+	TotalAmount    string `json:"total_amount"`
+	ReceiptAmount  string `json:"receipt_amount"`
 	BuyerPayAmount string `json:"buyer_pay_amount"`
-	PointAmount  string `json:"point_amount"`
-	InvoiceAmount string `json:"invoice_amount"`
-	GmtCreate    string `json:"gmt_create"`
-	GmtPayment   string `json:"gmt_payment"`
-	SellerID     string `json:"seller_id"`
-	SellerEmail  string `json:"seller_email"`
-	BuyerID      string `json:"buyer_id"`
-	BuyerLogID   string `json:"buyer_log_id"`
-	BuyerName    string `json:"buyer_name"`
+	PointAmount    string `json:"point_amount"`
+	InvoiceAmount  string `json:"invoice_amount"`
+	GmtCreate      string `json:"gmt_create"`
+	GmtPayment     string `json:"gmt_payment"`
+	SellerID       string `json:"seller_id"`
+	SellerEmail    string `json:"seller_email"`
+	BuyerID        string `json:"buyer_id"`
+	BuyerLogID     string `json:"buyer_log_id"`
+	BuyerName      string `json:"buyer_name"`
 }
 
 type AlipayTradeResponse struct {
-	Code    string `json:"code"`
-	Msg     string `json:"msg"`
+	Code       string `json:"code"`
+	Msg        string `json:"msg"`
 	OutTradeNo string `json:"out_trade_no"`
-	TradeNo string `json:"trade_no"`
+	TradeNo    string `json:"trade_no"`
 }
 
 func NewAlipayCallbackHandler(appID, alipayPubKey string) *AlipayCallbackHandler {
 	return &AlipayCallbackHandler{
-		appID:       appID,
+		appID:        appID,
 		alipayPubKey: alipayPubKey,
 	}
 }
