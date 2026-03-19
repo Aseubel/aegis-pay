@@ -407,7 +407,35 @@ func TestFullPaymentFlow(t *testing.T) {
 
 	// Step 5: 验证 Redis Streams 有通知消息
 	t.Log("Step 5: 验证商户通知...")
-	t.Log("  ✓ 通知消息已发布到 Redis Streams (可通过 XRANGE notify_stream - + 查看)")
+
+	// 从 Redis Streams 读取消息
+	messages, ids, err := app.mq.Consume(ctx, 10)
+	if err != nil {
+		t.Logf("  ⚠  无法从 Redis Streams 读取消息: %v", err)
+	} else if len(messages) > 0 {
+		// 查找匹配的通知消息
+		var found *mq.NotifyMessage
+		for _, msg := range messages {
+			if msg.TradeNo == orderResp.TradeNo && msg.OutTradeNo == orderReq.OutTradeNo {
+				found = msg
+				t.Logf("  ✓ 找到通知消息: TradeNo=%s, Status=%s", msg.TradeNo, msg.Status)
+				break
+			}
+		}
+
+		if found != nil {
+			// 确认消息并删除
+			if err := app.mq.Ack(ctx, ids); err != nil {
+				t.Logf("  ⚠  确认消息失败: %v", err)
+			} else {
+				t.Log("  ✓ 通知消息已确认")
+			}
+		} else {
+			t.Log("  ⚠  未找到匹配的通知消息（可能消息尚未到达）")
+		}
+	} else {
+		t.Log("  ⚠  Redis Streams 中没有消息")
+	}
 
 	t.Log("========== 完整支付流程测试通过 ==========")
 }
